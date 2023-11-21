@@ -1,0 +1,6 @@
+[submodule "src/pypulseq_interface"]
+	path = src/pypulseq_interface
+	url = git@schmidt-jo:schmidt-jo/pypulseq_interface.git
+[submodule "src/twixtools"]
+	path = src/twixtools
+	url = git@schmidt-jo:schmidt-jo/twixtools.git
