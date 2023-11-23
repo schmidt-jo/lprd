@@ -2,6 +2,7 @@ import numpy as np
 import scipy.ndimage as sndi
 import logging
 from lprd import helper_fns
+import tqdm
 
 log_module = logging.getLogger(__name__)
 
@@ -10,9 +11,22 @@ def fft_mag_sos_phase_aspire_recon(k_data_xyz_ch_t: np.ndarray,
                                    se_indices: tuple = (0, 1),
                                    combine_phase: bool = True) -> (np.ndarray, np.ndarray, np.ndarray):
     # fft
+    # try compression before combination
+    num_compress_channels = 8
+    k_data_xyz_ch_t_compressed = np.zeros(
+        (*k_data_xyz_ch_t.shape[:3], num_compress_channels, k_data_xyz_ch_t.shape[-1])
+    )
+    for echo_idx in tqdm.trange(k_data_xyz_ch_t.shape[-1], desc="compress channels per echo"):
+        k_data_xyz_ch_t_compressed[:, :, :, :, echo_idx] = np.squeeze(
+            helper_fns.compress_channels(
+                input_k_space=k_data_xyz_ch_t[:, :, :, :, echo_idx], num_compressed_channels=num_compress_channels
+            )
+        )
+
+    data_xyz_ch_t_compressed, _ = helper_fns.data_fft_to_time(data=k_data_xyz_ch_t_compressed, axes=(0, 1))
     data_xyz_ch_t, _ = helper_fns.data_fft_to_time(data=k_data_xyz_ch_t, axes=(0, 1))
 
-    data_xyzt_mag = magnitude_coil_combination(data_xyz_ch_t=data_xyz_ch_t)
+    data_xyzt_mag = magnitude_coil_combination(data_xyz_ch_t=data_xyz_ch_t_compressed)
     if combine_phase:
         data_xyzt_ph, grad_offset = phase_coil_combination(data_xyz_ch_t=data_xyz_ch_t, se_indices=se_indices)
     else:
