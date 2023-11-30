@@ -37,14 +37,12 @@ def fft_mag_sos_phase_aspire_recon(k_data_xyz_ch_t: np.ndarray,
 def magnitude_coil_combination(data_xyz_ch_t: np.ndarray) -> np.ndarray:
     log_module.info(f"processing magnitude coil combination")
     # magnitude sos - assume channel in 3 dim - possibly complex data! we need to use rSoS on magnitude data
-    return np.abs(
-        np.sqrt(
-            np.sum(
-                np.square(
-                    np.abs(data_xyz_ch_t)
-                ),
-                axis=3
-            )
+    return np.sqrt(
+        np.sum(
+            np.square(
+                np.abs(data_xyz_ch_t)
+            ),
+            axis=3
         )
     )
 

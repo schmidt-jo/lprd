@@ -48,13 +48,24 @@ def main():
     fov_phase = pd_meas.PhaseFoV
     slice_thickness = pd_meas_yaps_slice.asSlice[0]["dThickness"]
     slice_pos = []
+    raw_data_flags = []
+    noise_data_nums = []
+    data_counter = 0
+
     for mdb in mdbs:
         z_pos = mdb.mdh.SliceData.SlicePos.Tra
+        for flag in mdb.get_active_flags():
+            if flag not in raw_data_flags:
+                raw_data_flags.append(flag)
+            if flag == "NOISEADJSCAN":
+                noise_data_nums.append(data_counter)
+                data_counter += 1
         if slice_pos:
             if np.min(np.abs(np.array(slice_pos) - z_pos)) > 1e-6:
                 slice_pos.append(z_pos)
         else:
             slice_pos.append(z_pos)
+
     slice_pos_ordered = np.sort(slice_pos)
     slice_index_mapping = np.searchsorted(slice_pos_ordered, slice_pos)
     vox_size = np.array([fov_read, fov_phase, slice_thickness]) / np.array([n_fe_base, n_pe, 1.0])
@@ -63,7 +74,7 @@ def main():
 
     k_space_img = np.zeros((n_fe, n_pe, n_slices, n_coils, n_echoes), dtype=complex)
     k_space_ref = np.zeros((n_fe, n_pe, n_slices, n_coils, n_echoes), dtype=complex)
-
+    noise_data = []
     for k in tqdm.trange(len(mdbs), desc="process mdbs"):
         mdb = mdbs[k]
         flags = mdb.get_active_flags()
@@ -75,21 +86,47 @@ def main():
         t = mdb.cEco
         sli = mdb.cSlc
 
-        if mdb.is_image_scan():
+        if "NOISEADJSCAN" in flags:
+            noise_data.append(data)
+        elif mdb.is_image_scan():
             k_space_img[:, pe, slice_index_mapping[sli], :, t] = data
         else:
             k_space_ref[:, pe, sli, :, t] = data
-    logging.info("plot k-space slice")
+    logging.info("Pre-whiten / channel de-correlation")
+    # pre whiten / noise decorrelation
+    noise_data = np.squeeze(np.array(noise_data)).T
+    # calculate noise correlation matrix, dims [nfe, nch].T
+    noise_cov = np.cov(noise_data)
+    test_cov = np.cov(k_space_img[:, 0, 0, :, 0].T)
+    plot_data = np.concatenate((noise_cov[None], test_cov[None]), axis=0)
     fig_path = plib.Path("/data/pt_np-jschmidt/code/lprd/src/lprd/dev").absolute()
+    fig = px.imshow(np.abs(plot_data), facet_col=0)
+    fig_file = fig_path.joinpath("noise_cov").with_suffix(".html")
+    logging.info(f"\t\t - write channel covariance matrix plot: {fig_file.as_posix()}")
+    fig.write_html(fig_file.as_posix())
+    # calculate psi pre whitening matrix
+    psi = np.matmul(noise_data, noise_data.T.conj()) / (noise_data.shape[1] - 1)
+    psi_l = np.linalg.cholesky(psi)
+    if not np.allclose(psi, np.dot(psi_l, psi_l.T.conj())):
+        # verify that L * L.H = A
+        err = "cholesky decomposition error"
+        logging.error(err)
+        raise AssertionError(err)
+    psi_l_inv = np.linalg.inv(psi_l)
+    # whiten data, psi_l_inv dim [nch, nch], k-space dims [nfe, npe, nsli, nch, nechos]
+    k_space_img = np.einsum("ijkmn, lm -> ijkln", k_space_img, psi_l_inv, optimize=True)
+    k_space_ref = np.einsum("ijkmn, lm -> ijkln", k_space_ref, psi_l_inv, optimize=True)
+
+    logging.info("plot k-space slice")
     fig = px.imshow(np.swapaxes(np.log(np.abs(k_space_img[:, :, 10, 0])), 0, 1),
                     facet_col=-1, facet_col_wrap=4)
     fig_file = fig_path.joinpath("k-space-sort-semc").with_suffix(".html")
-    logging.info(f"\t\t - write image k-space peek file: {fig_path.as_posix()}")
+    logging.info(f"\t\t - write image k-space peek file: {fig_file.as_posix()}")
     fig.write_html(fig_file.as_posix())
     fig = px.imshow(np.swapaxes(np.log(np.abs(k_space_ref[:, :, 10, 0])), 0, 1),
                     facet_col=-1, facet_col_wrap=4)
     fig_file = fig_path.joinpath("k-space-ref-semc").with_suffix(".html")
-    logging.info(f"\t\t - write image k-space ref peek file: {fig_path.as_posix()}")
+    logging.info(f"\t\t - write image k-space ref peek file: {fig_file.as_posix()}")
     fig.write_html(fig_file.as_posix())
 
     # remove os
