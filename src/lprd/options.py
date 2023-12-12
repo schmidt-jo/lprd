@@ -18,7 +18,8 @@ class Config(sp.Serializable):
     )
     pyp_interface_file: str = sp.field(
         alias=["-p", "-pif"],
-        default="/data/pt_np-jschmidt/code/data_pipe_pulseq/example_data/jstmc4b_sampling-pattern.pkl"
+        default="/data/pt_np-jschmidt/code/data_pipe_pulseq/example_data/jstmc4b_sampling-pattern.pkl",
+        help="necessary when dealing with pypulseq sequences. Input of recon data and tracing"
     )
     output_path: str = sp.field(
         alias="-o",

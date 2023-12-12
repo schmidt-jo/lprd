@@ -3,8 +3,20 @@ import pathlib as plib
 import plotly.express as px
 import logging
 import numpy as np
-
+import typing
 log_module = logging.getLogger(__name__)
+
+
+def visualize_noise_cov(noise_cov: typing.Union[int, np.ndarray], opts: options.Config, name: str = ""):
+    if isinstance(noise_cov, int):
+        return
+    if name:
+        name += "_"
+    fig = px.imshow(np.abs(noise_cov))
+    file_name = plib.Path(opts.output_path).absolute()
+    file_name = file_name.joinpath("plots").joinpath(f"{name}noise_cov").with_suffix(".html")
+    log_module.info(f"\t- writing plot file: {file_name}")
+    fig.write_html(file_name.as_posix())
 
 
 def visualize_mag_phase_slice(k_slice_mag_phase_xy: np.ndarray, opts: options.Config, name=""):

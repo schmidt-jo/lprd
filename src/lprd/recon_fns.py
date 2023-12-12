@@ -13,9 +13,10 @@ def fft_mag_sos_phase_aspire_recon(k_data_xyz_ch_t: np.ndarray,
     # fft
     data_xyz_ch_t, _ = helper_fns.data_fft_to_time(data=k_data_xyz_ch_t, axes=(0, 1))
     # try compression before combination
-    num_compress_channels = 8
+    num_compress_channels = 16
     data_xyz_ch_t_compressed = np.zeros(
-        (*data_xyz_ch_t.shape[:3], num_compress_channels, data_xyz_ch_t.shape[-1])
+        (*data_xyz_ch_t.shape[:3], num_compress_channels, data_xyz_ch_t.shape[-1]),
+        dtype=complex
     )
     for echo_idx in tqdm.trange(k_data_xyz_ch_t.shape[-1], desc="compress channels per echo"):
         data_xyz_ch_t_compressed[:, :, :, :, echo_idx] = np.squeeze(

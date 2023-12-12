@@ -4,3 +4,6 @@
 [submodule "src/twixtools"]
 	path = src/twixtools
 	url = git@schmidt-jo:schmidt-jo/twixtools.git
+[submodule "src/pygrappa"]
+	path = src/pygrappa
+	url = git@schmidt-jo:schmidt-jo/pygrappa.git
